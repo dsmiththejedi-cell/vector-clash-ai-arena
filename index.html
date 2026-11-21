@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vector Clash // AI Arena</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :html { color-scheme: dark; }
+    body {
+      background:
+        radial-gradient(circle at 15% 20%, rgba(34,211,238,.07), transparent 24rem),
+        radial-gradient(circle at 85% 75%, rgba(244,63,94,.06), transparent 24rem),
+        #070912;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+    .panel {
+      background: rgba(10, 14, 28, .78);
+      border: 1px solid rgba(148,163,184,.12);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+      backdrop-filter: blur(14px);
+    }
+    .neon-blue { color: #38bdf8; text-shadow: 0 0 18px rgba(56,189,248,.55); }
+    .neon-crimson { color: #fb7185; text-shadow: 0 0 18px rgba(251,113,133,.55); }
+    canvas { width: 100%; height: 100%; display: block; }
+    .scanlines {
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.012) 3px 4px);
+    }
+    input[type="range"] { accent-color: #22d3ee; }
+    .code-line { min-height: 1.35rem; }
+    .code-line.active { background: rgba(34,211,238,.08); border-left: 2px solid #22d3ee; }
+    .toggle-dot { transition: transform .2s ease; }
+    .toggle-on { background: #0891b2; }
+    .toggle-on .toggle-dot { transform: translateX(18px); }
+    @keyframes pulse-ring {
+      0% { transform: scale(.7); opacity: .9; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+  </style>
+</head>
+<body class="h-screen overflow-hidden text-slate-200">
+  <div class="h-full p-3 xl:p-4 flex flex-col gap-3">
+    <header class="h-14 shrink-0 panel rounded-xl px-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg border border-cyan-400/40 bg-cyan-400/10 grid place-items-center">
+          <div class="w-3 h-3 rounded-full bg-cyan-300 shadow-[0_0_16px_#22d3ee]"></div>
+        </div>
+        <div>
+          <h1 class="text-sm font-bold tracking-[.22em] text-white">VECTOR CLASH <span class="text-cyan-400">//</span> AI ARENA</h1>
+          <p class="text-[9px] tracking-[.28em] text-slate-500 mt-1">AUTONOMOUS FUNCTION COMBAT SYSTEM</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="roundStatus" class="hidden sm:flex items-center gap-2 text-[10px] tracking-widest text-slate-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+          SYSTEM READY
+        </div>
+        <button id="configBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-slate-900/60 text-xs text-slate-300 hover:border-cyan-400/50 transition">
+          ⚙ CONFIG
+        </button>
+      </div>
+    </header>
+
+    <main class="min-h-0 flex-1 grid grid-cols-12 gap-3">
+      <aside class="col-span-3 flex flex-col gap-3 min-h-0">
+        <section class="panel rounded-xl p-3">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-[10px] tracking-[.2em] text-slate-400">COMBATANTS</span>
+            <span class="text-[9px] text-slate-600">LIVE</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="rounded-lg border border-sky-400/20 bg-sky-400/[.04] p-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold neon-blue">POINT A</span>
+                <span id="aHealthText" class="text-[10px] text-sky-300">100</span>
+              </div>
+              <div class="mt-2 h-1.5 rounded-full bg-slate-950 overflow-hidden">
+                <div id="aHealth" class="h-full rounded-full bg-sky-400 shadow-[0_0_10px_#38bdf8]" style="width:100%"></div>
+              </div>
+              <div class="mt-2 flex justify-between text-[9px] text-slate-500">
+                <span>HIT SCORE</span><b id="aScore" class="text-sky-300">0</b>
+              </div>
+            </div>
+            <div class="rounded-lg border border-rose-400/20 bg-rose-400/[.04] p-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold neon-crimson">POINT B</span>
+                <span id="bHealthText" class="text-[10px] text-rose-300">100</span>
+              </div>
+              <div class="mt-2 h-1.5 rounded-full bg-slate-950 overflow-hidden">
+                <div id="bHealth" class="h-full rounded-full bg-rose-400 shadow-[0_0_10px_#fb7185]" style="width:100%"></div>
+              </div>
+              <div class="mt-2 flex justify-between text-[9px] text-slate-500">
+                <span>HIT SCORE</span><b id="bScore" class="text-rose-300">0</b>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel rounded-xl p-3 min-h-0 flex-1 flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] tracking-[.2em] text-slate-400">FUNCTION INSPECTOR</span>
+            <span id="phaseText" class="text-[9px] text-cyan-400">IDLE</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <button id="tabA" class="tab py-2 text-[10px] rounded border border-sky-400/30 bg-sky-400/10 text-sky-300">POINT A</button>
+            <button id="tabB" class="tab py-2 text-[10px] rounded border border-slate-700 text-slate-500">POINT B</button>
+          </div>
+          <div class="flex-1 min-h-0 rounded-lg bg-[#080b15] border border-slate-800/70 p-2 overflow-hidden">
+            <div class="flex items-center gap-1.5 mb-2 text-[9px] text-slate-600">
+              <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+              <span class="w-2 h-2 rounded-full bg-amber-300"></span>
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="ml-2 tracking-widest">vector.js</span>
+            </div>
+            <pre id="codeInspector" class="text-[10px] leading-5 text-slate-400 overflow-auto h-[calc(100%-1.5rem)]"></pre>
+          </div>
+        </section>
+
+        <section class="panel rounded-xl p-3 h-36">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] tracking-[.2em] text-slate-400">EXECUTION LOG</span>
+            <button id="clearLog" class="text-[9px] text-slate-600 hover:text-slate-300">CLEAR</button>
+          </div>
+          <div id="turnLog" class="h-[calc(100%-1.5rem)] overflow-y-auto space-y-1 font-mono text-[9px]"></div>
+        </section>
+      </aside>
+
+      <section class="col-span-6 panel rounded-xl p-2 min-h-0 flex flex-col relative">
+        <div class="absolute z-10 top-5 left-5 text-[9px] tracking-[.18em] text-slate-500">CARTESIAN FIELD / SCALE 1:1</div>
+        <div class="absolute z-10 top-5 right-5 flex gap-2">
+          <span id="tickText" class="text-[9px] tracking-wider text-slate-500">T+00.00</span>
+          <span id="fpsText" class="text-[9px] tracking-wider text-emerald-400">60 FPS</span>
+        </div>
+        <div class="flex-1 min-h-0 relative rounded-lg overflow-hidden bg-[#080b15]">
+          <canvas id="arena"></canvas>
+          <div class="scanlines absolute inset-0"></div>
+        </div>
+        <div class="h-16 shrink-0 flex items-center justify-center gap-2 px-2">
+          <button id="startBtn" class="control-btn px-5 h-10 rounded-lg bg-cyan-500 text-[#061018] text-xs font-bold tracking-wider shadow-[0_0_20px_rgba(34,211,238,.18)] hover:bg-cyan-300 transition">
+            ▶ START ROUND
+          </button>
+          <button id="pauseBtn" class="control-btn h-10 px-4 rounded-lg border border-slate-700 bg-slate-900/70 text-xs text-slate-300 hover:border-slate-500 transition">
+            Ⅱ PAUSE
+          </button>
+          <button id="stepBtn" class="control-btn h-10 px-4 rounded-lg border border-slate-700 bg-slate-900/70 text-xs text-slate-300 hover:border-slate-500 transition">
+            ↦ STEP
+          </button>
+          <button id="resetBtn" class="control-btn h-10 px-4 rounded-lg border border-slate-700 bg-slate-900/70 text-xs text-slate-300 hover:border-slate-500 transition">
+            ↻ RESET
+          </button>
+        </div>
+      </section>
+
+      <aside class="col-span-3 flex flex-col gap-3 min-h-0">
+        <section class="panel rounded-xl p-3">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-[10px] tracking-[.2em] text-slate-400">ACTIVE TRAJECTORIES</span>
+            <span id="projectileCount" class="text-[10px] text-cyan-400">0</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="rounded-lg border border-sky-400/15 p-2 bg-sky-400/[.03]">
+              <div class="text-[9px] text-slate-500">POINT A VECTOR</div>
+              <div id="aVector" class="mt-1 text-[10px] text-sky-300 font-mono">f(t)=idle</div>
+            </div>
+            <div class="rounded-lg border border-rose-400/15 p-2 bg-rose-400/[.03]">
+              <div class="text-[9px] text-slate-500">POINT B VECTOR</div>
+              <div id="bVector" class="mt-1 text-[10px] text-rose-300 font-mono">f(t)=idle</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel rounded-xl p-3 min-h-0 flex-1">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-[10px] tracking-[.2em] text-slate-400">SIMULATION PARAMETERS</span>
+            <button id="closeConfig" class="hidden text-slate-500">×</button>
+          </div>
+          <div class="space-y-5">
+            <label class="block">
+              <div class="flex justify-between text-[10px] mb-2">
+                <span class="text-slate-400">Obstacle Density</span>
+                <span id="densityVal" class="text-cyan-300">Medium</span>
+              </div>
+              <input id="density" type="range" min="4" max="12" value="8" class="w-full h-1" />
+            </label>
+            <label class="block">
+              <div class="flex justify-between text-[10px] mb-2">
+                <span class="text-slate-400">Gravity Multiplier</span>
+                <span id="gravityVal" class="text-cyan-300">1.0×</span>
+              </div>
+              <input id="gravity" type="range" min="0" max="20" value="10" class="w-full h-1" />
+            </label>
+            <label class="block">
+              <div class="flex justify-between text-[10px] mb-2">
+                <span class="text-slate-400">AI Aggression</span>
+                <span id="aggressionVal" class="text-cyan-300">Balanced</span>
+              </div>
+              <input id="aggression" type="range" min="1" max="3" value="2" class="w-full h-1" />
+            </label>
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-[10px] text-slate-400">Arc Tracing</span>
+              <button id="traceToggle" class="toggle-on w-10 h-5 rounded-full bg-slate-700 p-[2px]"><span class="toggle-dot block w-4 h-4 rounded-full bg-white"></span></button>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-slate-400">Ricochet Physics</span>
+              <button id="ricochetToggle" class="toggle-on w-10 h-5 rounded-full bg-slate-700 p-[2px]"><span class="toggle-dot block w-4 h-4 rounded-full bg-white"></span></button>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-slate-400">AI Dialogue</span>
+              <button id="dialogueToggle" class="toggle-on w-10 h-5 rounded-full bg-slate-700 p-[2px]" aria-label="Toggle AI dialogue"><span class="toggle-dot block w-4 h-4 rounded-full bg-white"></span></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel rounded-xl p-3 h-28">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] tracking-[.2em] text-slate-400">ROUND TELEMETRY</span>
+            <span id="winnerText" class="text-[9px] text-slate-600">NO RESULT</span>
+          </div>
+          <div class="grid grid-cols-3 text-center divide-x divide-slate-800">
+            <div><div id="shotsText" class="text-lg font-semibold text-slate-200">0</div><div class="text-[8px] text-slate-600 tracking-widest">SHOTS</div></div>
+            <div><div id="hitsText" class="text-lg font-semibold text-slate-200">0</div><div class="text-[8px] text-slate-600 tracking-widest">HITS</div></div>
+            <div><div id="roundText" class="text-lg font-semibold text-slate-200">01</div><div class="text-[8px] text-slate-600 tracking-widest">ROUND</div></div>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('arena');
+      const ctx = canvas.getContext('2d');
+      const WORLD = { minX: -10, maxX: 10, minY: -10, maxY: 10 };
+      const colors = { blue: '#38bdf8', crimson: '#fb7185' };
+
+      let w = 0, h = 0, dpr = 1, scale = 1, centerX = 0, centerY = 0;
+      let running = false, paused = false, stepping = false, traceEnabled = true, ricochetEnabled = true, dialogueEnabled = true;
+      let obstacles = [], projectiles = [], particles = [], explosions = [], tracers = [];
+      let turn = 'A', roundStart = 0, roundNumber = 1, shots = 0, hits = 0;
+      let lastTime = performance.now(), fpsTime = lastTime, fpsFrames = 0, fps = 60;
+      let activeTab = 'A', roundOver = false;
+
+      const agents = {
+        A: { x: -8.2, y: 0, health: 100, score: 0, color: colors.blue, code: [], vector: null, missStreak: 0, attempts: 0, hits: 0, adaptations: 0, obstacleMemory: [], dialogue: 'Awaiting trajectory...', dialogueLife: 0 },
+        B: { x: 8.2, y: 0, health: 100, score: 0, color: colors.crimson, code: [], vector: null, missStreak: 0, attempts: 0, hits: 0, adaptations: 0, obstacleMemory: [], dialogue: 'Awaiting trajectory...', dialogueLife: 0 }
+      };
+
+      function resize() {
+        const rect = canvas.getBoundingClientRect();
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        w = rect.width; h = rect.height;
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        scale = Math.min(w / 22, h / 22);
+        centerX = w / 2; centerY = h / 2;
+      }
+
+      const tx = x => centerX + x * scale;
+      const ty = y => centerY - y * scale;
+
+      function randomRange(a, b) { return a + Math.random() * (b - a); }
+      function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+      function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+      function generateObstacles() {
+        obstacles = [];
+        const count = +document.getElementById('density').value;
+        let attempts = 0;
+        while (obstacles.length < count && attempts++ < 300) {
+          const rect = Math.random() > .38;
+          const o = rect
+            ? { type: 'rect', x: randomRange(-7.2, 7.2), y: randomRange(-7.2, 7.2), w: randomRange(.8, 2.2), h: randomRange(.8, 2.4), kind: Math.random() > .72 ? 'shatter' : 'reflect' }
+            : { type: 'circle', x: randomRange(-7.2, 7.2), y: randomRange(-7.2, 7.2), r: randomRange(.55, 1.25), kind: Math.random() > .72 ? 'absorb' : 'reflect' };
+          if (Math.abs(o.x) > 6 || Math.abs(o.y) > 7) continue;
+          if (rect ? (Math.abs(o.x) < 5.2 && Math.abs(o.y) < 5.2) : (Math.abs(o.x) < 5.5 && Math.abs(o.y) < 5.5)) {
+            if (Math.random() > .55) continue;
+          }
+          if (o.type === 'rect') {
+            if (o.x - o.w/2 < -9.5 || o.x + o.w/2 > 9.5 || o.y - o.h/2 < -9.5 || o.y + o.h/2 > 9.5) continue;
+          }
+          obstacles.push(o);
+        }
+      }
+
+      function resetRound(full = false) {
+        if (full) { roundNumber = 1; agents.A.score = 0; agents.B.score = 0; }
+        for (const key of ['A','B']) {
+          agents[key].missStreak = 0;
+          agents[key].attempts = 0;
+          agents[key].hits = 0;
+          agents[key].adaptations = 0;
+          agents[key].code = [];
+          agents[key].vector = null;
+          agents[key].obstacleMemory = [];
+        }
+        agents.A.x = -8.2; agents.A.y = 0; agents.A.health = 100;
+        agents.B.x = 8.2; agents.B.y = 0; agents.B.health = 100;
+        projectiles = []; particles = []; explosions = []; tracers = [];
+        shots = 0; hits = 0; turn = 'A'; roundOver = false;
+        roundStart = performance.now();
+        generateObstacles();
+        updateHud();
+        document.getElementById('winnerText').textContent = 'NO RESULT';
+        document.getElementById('winnerText').className = 'text-[9px] text-slate-600';
+        log('Round ' + String(roundNumber).padStart(2,'0') + ' initialized');
+      }
+
+      function log(message, agent) {
+        const el = document.getElementById('turnLog');
+        const row = document.createElement('div');
+        const stamp = ((performance.now() - roundStart) / 1000).toFixed(2).padStart(5,'0');
+        row.innerHTML = `<span class="text-slate-600">${stamp}s</span> <span class="${agent === 'A' ? 'text-sky-400' : agent === 'B' ? 'text-rose-400' : 'text-emerald-400'}">${agent ? '['+agent+']' : '[SYS]'}</span> ${message}`;
+        el.prepend(row);
+      }
+
+      function updateHud() {
+        for (const key of ['A','B']) {
+          const a = agents[key];
+          document.getElementById(key.toLower === 'a' ? 'aHealth' : 'bHealth').style.width = clamp(a.health,0,100)+'%';
+          document.getElementById(key.toLower === 'a' ? 'aHealthText' : 'bHealthText').textContent = Math.max(0,Math.round(a.health));
+          document.getElementById(key.toLower === 'a' ? 'aScore' : 'bScore').textContent = a.score;
+        }
+        document.getElementById('shotsText').textContent = shots;
+        document.getElementById('hitsText').textContent = hits;
+        document.getElementById('roundText').textContent = String(roundNumber).padStart(2,'0');
+        document.getElementById('projectileCount').textContent = projectiles.length;
+      }
+
+      function drawGrid() {
+        ctx.clearRect(0,0,w,h);
+        ctx.fillStyle = '#080b15';
+        ctx.fillRect(0,0,w,h);
+
+        ctx.lineWidth = 1;
+        for (let x = -10; x <= 10; x++) {
+          ctx.strokeStyle = x === 0 ? 'rgba(148,163,184,.32)' : 'rgba(71,85,105,.13)';
+          ctx.beginPath(); ctx.moveTo(tx(x), ty(-10)); ctx.lineTo(tx(x), ty(10)); ctx.stroke();
+        }
+        for (let y = -10; y <= 10; y++) {
+          ctx.strokeStyle = y === 0 ? 'rgba(148,163,184,.32)' : 'rgba(71,85,105,.13)';
+          ctx.beginPath(); ctx.moveTo(tx(-10), ty(y)); ctx.lineTo(tx(10), ty(y)); ctx.stroke();
+        }
+        ctx.fillStyle = '#64748b';
+        ctx.font = '9px ui-monospace, monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        for (let x = -10; x <= 10; x += 2) {
+          if (x !== 0) ctx.fillText(String(x), tx(x), ty(0)+5);
+        }
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        for (let y = -10; y <= 10; y += 2) {
+          if (y !== 0) ctx.fillText(String(y), tx(0)-6, ty(y));
+        }
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('0', tx(0)-6, ty(0)+8);
+      }
+
+      function drawObstacles() {
+        for (const o of obstacles) {
+          ctx.save();
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = o.kind === 'shatter' ? 'rgba(251,191,36,.18)' : o.kind === 'absorb' ? 'rgba(167,139,250,.18)' : 'rgba(100,116,139,.12)';
+          if (o.type === 'rect') {
+            ctx.fillStyle = o.kind === 'shatter' ? 'rgba(120,83,20,.55)' : o.kind === 'absorb' ? 'rgba(70,55,105,.55)' : 'rgba(51,65,85,.62)';
+            ctx.strokeStyle = o.kind === 'shatter' ? 'rgba(251,191,36,.62)' : o.kind === 'absorb' ? 'rgba(167,139,250,.55)' : 'rgba(148,163,184,.38)';
+            ctx.fillRect(tx(o.x-o.w/2), ty(o.y+o.h/2), o.w*scale, o.h*scale);
+            ctx.strokeRect(tx(o.x-o.w/2), ty(o.y+o.h/2), o.w*scale, o.h*scale);
+          } else {
+            ctx.fillStyle = o.kind === 'absorb' ? 'rgba(70,55,105,.55)' : 'rgba(51,65,85,.62)';
+            ctx.strokeStyle = o.kind === 'absorb' ? 'rgba(167,139,250,.55)' : 'rgba(148,163,184,.38)';
+            ctx.beginPath(); ctx.arc(tx(o.x), ty(o.y), o.r*scale, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+
+      function drawAgent(key) {
+        const a = agents[key];
+        ctx.save();
+        ctx.shadowBlur = 18; ctx.shadowColor = a.color;
+        ctx.fillStyle = a.color;
+        ctx.beginPath(); ctx.arc(tx(a.x), ty(a.y), 7, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#08101a';
+        ctx.beginPath(); ctx.arc(tx(a.x), ty(a.y), 3, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = a.color; ctx.globalAlpha = .35;
+        ctx.beginPath(); ctx.arc(tx(a.x), ty(a.y), 12 + Math.sin(performance.now()/300)*2, 0, Math.PI*2); ctx.stroke();
+        ctx.restore();
+
+        if (dialogueEnabled && a.dialogueLife > 0) {
+          const sx=tx(a.x), sy=ty(a.y);
+          ctx.save();
+          ctx.globalAlpha=clamp(a.dialogueLife/2,0,1);
+          ctx.font='600 9px ui-monospace, monospace';
+          const width=Math.min(190,ctx.measureText(a.dialogue).width+18);
+          const bx=clamp(sx-width/2,8,w-width-8);
+          const by=Math.max(8,sy-48);
+          ctx.fillStyle='rgba(8,11,21,.94)';
+          ctx.strokeStyle=a.color;
+          ctx.lineWidth=1;
+          ctx.beginPath();
+          ctx.roundRect(bx,by,width,28,7);ctx.fill();ctx.stroke();
+          ctx.fillStyle=a.color;
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(a.dialogue,bx+width/2,by+14);
+          ctx.restore();
+        }
+      }
+
+      function drawProjectile(p) {
+        ctx.save();
+        ctx.shadowBlur = 14; ctx.shadowColor = p.color;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(tx(p.x), ty(p.y), 4, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+      }
+
+      function segmentCircleHit(px,py, cx,cy,r) {
+        return Math.hypot(px-cx,py-cy) <= r;
+      }
+
+      function obstacleHit(p) {
+        for (const o of obstacles) {
+          if (o.type === 'circle') {
+            if (segmentCircleHit(p.x,p.y,o.x,o.y,o.r+.12)) return o;
+          } else {
+            if (p.x >= o.x-o.w/2-.12 && p.x <= o.x+o.w/2+.12 && p.y >= o.y-o.h/2-.12 && p.y <= o.y+o.h/2+.12) return o;
+          }
+        }
+        return null;
+      }
+
+      function explosionAt(x,y,color) {
+        explosions.push({x,y,color,life:1});
+        for (let i=0;i<18;i++) {
+          const angle = Math.random()*Math.PI*2, speed=randomRange(2,7);
+          particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:1,color});
+        }
+      }
+
+      function positionBlocked(x, y) {
+        if (x < -9.2 || x > 9.2 || y < -9.2 || y > 9.2) return true;
+        for (const o of obstacles) {
+          if (o.type === 'circle') {
+            if (Math.hypot(x-o.x,y-o.y) < o.r+.35) return true;
+          } else if (x >= o.x-o.w/2-.35 && x <= o.x+o.w/2+.35 &&
+                     y >= o.y-o.h/2-.35 && y <= o.y+o.h/2+.35) return true;
+        }
+        return false;
+      }
+
+      function moveAgentOneUnit(source, target) {
+        const candidates = [
+          {x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}
+        ];
+        let best=candidates[0], bestScore=-Infinity;
+        for (const move of candidates) {
+          const nx=source.x+move.x, ny=source.y+move.y;
+          if (positionBlocked(nx,ny)) continue;
+
+          const oldDistance=Math.hypot(source.x-target.x,source.y-target.y);
+          const newDistance=Math.hypot(nx-target.x,ny-target.y);
+          const separationGain=newDistance-oldDistance;
+          let nearestCover=Infinity;
+          for (const o of obstacles) {
+            const ox=o.type==='circle'?o.r:Math.max(o.w,o.h)/2;
+            nearestCover=Math.min(nearestCover,Math.hypot(nx-o.x,ny-o.y)-ox);
+          }
+          const coverBonus=Math.max(0,2.5-nearestCover)*.24;
+          const boundaryPenalty=(Math.abs(nx)>8.2||Math.abs(ny)>8.2)?-.45:0;
+
+          // The candidate route is also scored by whether a clean shot exists after moving.
+          const routePreview=chooseObstacleRoute({x:nx,y:ny},target);
+          const routeBonus=routePreview.blocker ? .7 : 1.1;
+          const adaptability=source.missStreak*.10;
+          const score=separationGain*2.4+coverBonus+boundaryPenalty+routeBonus+adaptability
+            +(Math.random()*source.missStreak*.05);
+          if (score>bestScore) { best=move; bestScore=score; }
+        }
+        source.x=clamp(source.x+best.x,-9.2,9.2);
+        source.y=clamp(source.y+best.y,-9.2,9.2);
+        const newGap=Math.hypot(source.x-target.x,source.y-target.y);
+        const route=chooseObstacleRoute(source,target);
+        source.dialogue=route.blocker
+          ? `Separated to ${newGap.toFixed(1)}; route behind cover.`
+          : `Separated to ${newGap.toFixed(1)}; shot line optimal.`;
+        source.dialogueLife=1.8;
+        log(`relocated 1 unit to (${source.x.toFixed(1)}, ${source.y.toFixed(1)})`, agentKeyOf(source));
+      }
+
+      function agentKeyOf(agent) {
+        return agent===agents.A?'A':'B';
+      }
+
+      function registerMiss(agentKey, reason) {
+        const agent = agents[agentKey];
+        agent.missStreak++;
+        agent.adaptations = Math.min(5, agent.missStreak);
+        agent.dialogue = `Miss detected. Recalculating ${reason}.`;
+        agent.dialogueLife = 2.8;
+        log(`${reason}; adaptation level ${agent.adaptations}/5`, agentKey);
+      }
+
+      function rememberObstacle(agentKey, obstacle, impactX, impactY) {
+        const agent=agents[agentKey];
+        const topClear=9-(obstacle.type==='circle'?obstacle.y+obstacle.r:obstacle.y+obstacle.h/2);
+        const bottomClear=(obstacle.type==='circle'?obstacle.y-obstacle.r:obstacle.y-obstacle.h/2)-(-9);
+        const radius=obstacle.type==='circle'?obstacle.r:Math.max(obstacle.w/2,obstacle.h/2);
+        const memory={
+          x:obstacle.x,y:obstacle.y,radius,
+          type:obstacle.type,w:obstacle.w,h:obstacle.h,
+          impactX,impactY,
+          side:topClear>=bottomClear?1:-1,
+          encounters:(agent.obstacleMemory.find(m=>Math.abs(m.x-obstacle.x)<.7&&Math.abs(m.y-obstacle.y)<.7)?.encounters||0)+1
+        };
+        agent.obstacleMemory=agent.obstacleMemory.filter(m=>Math.abs(m.x-obstacle.x)>=.7||Math.abs(m.y-obstacle.y)>=.7);
+        agent.obstacleMemory.push(memory);
+        agent.adaptations=Math.min(5,agent.adaptations+1);
+        agent.dialogue=`Obstacle learned. Curve ${memory.side>0?'over':'under'} it on the next function.`;
+        agent.dialogueLife=3.2;
+        log(`adaptive solution stored for obstacle (${memory.x.toFixed(1)}, ${memory.y.toFixed(1)})`,agentKey);
+      }
+
+      function chooseObstacleRoute(source, target) {
+        const vx=target.x-source.x, vy=target.y-source.y;
+        const length=Math.hypot(vx,vy)||1;
+        let blocker=null, blockerScore=-1, tAt=-1;
+
+        for (const o of obstacles) {
+          let margin=o.type==='circle'?o.r+.45:Math.max(o.w,o.h)*.55+.45;
+          for (let u=.12;u<.88;u+=.04) {
+            const lx=source.x+vx*u, ly=source.y+vy*u;
+            const hits=o.type==='circle'
+              ? Math.hypot(lx-o.x,ly-o.y)<=o.r+.35
+              : lx>=o.x-o.w/2-margin && lx<=o.x+o.w/2+margin && ly>=o.y-o.h/2-margin && ly<=o.y+o.h/2+margin;
+            if (hits) {
+              const distanceToTarget=u*length;
+              const score=1/(1+distanceToTarget*.04);
+              if (score>blockerScore) { blocker=o; blockerScore=score; tAt=u; }
+              break;
+            }
+          }
+        }
+        if (!blocker) return {offset:0, blocker:null};
+
+        const lineY=source.y+(target.y-source.y)*tAt;
+        const topClear=9-(blocker.type==='circle'?blocker.y+blocker.r:blocker.y+blocker.h/2);
+        const bottomClear=(blocker.type==='circle'?blocker.y-blocker.r:blocker.y-blocker.h/2)-(-9);
+        const side=topClear>=bottomClear?1:-1;
+        const halfHeight=blocker.type==='circle'?blocker.r:blocker.h/2;
+        return {offset:side*(halfHeight+1.35), blocker,tAt,lineY};
+      }
+
+      function fire(agentKey) {
+        if (roundOver) return;
+        const source = agents[agentKey], target = agents[agentKey === 'A' ? 'B' : 'A'];
+        moveAgentOneUnit(source,target);
+        const difficulty = +document.getElementById('aggression').value;
+        const dx = target.x - source.x, dy = target.y - source.y;
+        const dist = Math.hypot(dx,dy);
+        source.attempts++;
+
+        // Repeated misses reduce random error and progressively broaden function selection.
+        const missReduction = Math.min(.85, source.missStreak * .13);
+        const inaccuracy = (3-difficulty)*.28*(1-missReduction);
+        const aimAngle = Math.atan2(dy,dx) + randomRange(-inaccuracy,inaccuracy);
+        const arc = .8 + Math.random()*1.8 + (3-difficulty)*.3 + source.missStreak*.12;
+        const speed = clamp(dist * (.62 + difficulty*.05), 5.8, 10.2);
+        const gravity = +document.getElementById('gravity').value / 10;
+        const route = chooseObstacleRoute(source,target);
+        let learned=null;
+        for (const memory of source.obstacleMemory) {
+          if (memory.x >= Math.min(source.x,target.x)-1 && memory.x <= Math.max(source.x,target.x)+1) learned=memory;
+        }
+        let routeOffset = route.offset*(route.blocker?1:.15);
+        if (learned) {
+          routeOffset=learned.side*(learned.radius+1.25);
+        }
+        const duration = clamp(dist/Math.max(5.8,speed),1.5,3.2);
+        const vx = dx/duration;
+        let vy = Math.sin(aimAngle)*speed + arc;
+        if (difficulty === 1) vy *= .78;
+
+        const families = [
+          'quadratic','sin','cos','tan','arctan','arccos','arcos','arcsin',
+          'sec','csc','cot','exponential','logarithmic','step','limit'
+        ];
+        let familyIndex = source.missStreak >= 2
+          ? Math.floor(Math.random()*families.length)
+          : Math.floor(Math.random()*Math.min(10, families.length));
+        let family = families[familyIndex];
+        if (learned) {
+          family = learned.encounters>=2 ? 'sin' : (familyIndex%2===0?'quadratic':'cos');
+        }
+        const amplitude = clamp(.55 + source.missStreak*.18 + Math.random()*1.1, .55, 2.2);
+        const frequency = .9 + source.missStreak*.12;
+        const rate = .7 + source.missStreak*.15;
+
+        let code, vector;
+        if (family === 'quadratic') {
+          code = [
+            `function quadratic(t) {`,
+            `  // y(t) = a t² + bt + c`,
+            `  const a = ${(-gravity*2.2).toFixed(2)}, b = ${vy.toFixed(2)}, c = ${source.y.toFixed(2)};`,
+            `  return { x: ${source.x.toFixed(2)} + (${vx.toFixed(2)} * t), y: a*t**2 + b*t + c };`,
+            `}`,
+            `// adaptation=${source.missStreak}, generated by Point ${agentKey}`
+          ];
+          vector = `y=a t²+b t+c`;
+        } else if (['sin','cos','tan','arctan','arccos','arcos','arcsin','sec','csc','cot'].includes(family)) {
+          const expressions={
+            sin:`${amplitude.toFixed(2)} * sin(phase)`,
+            cos:`${amplitude.toFixed(2)} * cos(phase)`,
+            tan:`${amplitude.toFixed(2)} * tan(clamp(phase,-1.2,1.2))`,
+            arctan:`${amplitude.toFixed(2)} * atan(t/Math.max(1,${duration.toFixed(2)}))`,
+            arccos:`${amplitude.toFixed(2)} * acos(clamp(1-2*t/${duration.toFixed(2)},-1,1))`,
+            arcos:`${amplitude.toFixed(2)} * acos(clamp(1-2*t/${duration.toFixed(2)},-1,1))`,
+            arcsin:`${amplitude.toFixed(2)} * asin(clamp(2*t/${duration.toFixed(2)}-1,-1,1))`,
+            sec:`${amplitude.toFixed(2)} * sec(phase)`,
+            csc:`${amplitude.toFixed(2)} * csc(phase)`,
+            cot:`${amplitude.toFixed(2)} * cot(phase)`
+          };
+          code = [
+            `function ${family}(t) {`,
+            `  const phase = ${frequency.toFixed(2)} * t;`,
+            `  const envelope = ${expressions[family]};`,
+            `  return {`,
+            `    x: ${source.x.toFixed(2)} + ${vx.toFixed(2)}t,`,
+            `    y: ${source.y.toFixed(2)} + ${dy.toFixed(2)}*(t/${duration.toFixed(2)}) + envelope`,
+            `  };`,
+            `}`,
+            `// adaptation=${source.missStreak}, generated by Point ${agentKey}`
+          ];
+          const notation={
+            sin:'y=A sin(ωt)+Bt+C',cos:'y=A cos(ωt)+Bt+C',tan:'y=A tan(ωt)+Bt+C',
+            arctan:'y=A arctan(t/T)+Bt+C',arccos:'y=A arccos(u)+Bt+C',
+            arcos:'y=A arccos(u)+Bt+C',
+            arcsin:'y=A arcsin(u)+Bt+C',sec:'y=A sec(ωt)+Bt+C',
+            csc:'y=A csc(ωt)+Bt+C',cot:'y=A cot(ωt)+Bt+C'
+          };
+          vector=notation[family];
+        } else if (family === 'exponential') {
+          code = [
+            `function exponential(t) {`,
+            `  const k = ${rate.toFixed(2)};`,
+            `  const E = (exp(k*t)-1)/(exp(k*${duration.toFixed(2)})-1);`,
+            `  return {`,
+            `    x: ${source.x.toFixed(2)} + ${vx.toFixed(2)}t,`,
+            `    y: ${source.y.toFixed(2)} + ${dy.toFixed(2)}*E`,
+            `  };`,
+            `}`,
+            `// adaptation=${source.missStreak}, generated by Point ${agentKey}`
+          ];
+          vector = `y=C(eᵏᵗ−1)/(eᵏᵀ−1)`;
+        } else if (family === 'logarithmic') {
+          code = [
+            `function logarithmic(t) {`,
+            `  const k = ${rate.toFixed(2)};`,
+            `  const L = log(1+k*t)/log(1+k*${duration.toFixed(2)});`,
+            `  return {`,
+            `    x: ${source.x.toFixed(2)} + ${vx.toFixed(2)}t,`,
+            `    y: ${source.y.toFixed(2)} + ${dy.toFixed(2)}*L`,
+            `  };`,
+            `}`,
+            `// adaptation=${source.missStreak}, generated by Point ${agentKey}`
+          ];
+          vector = `y=C ln(1+kt)/ln(1+kT)`;
+        } else if (family === 'step') {
+          code = [
+            `function step(t) {`,
+            `  const phase = floor(t / ${(duration/3).toFixed(2)});`,
+            `  const yOffset = [-0.8, 0, 0.8, 0][min(phase,3)] * ${amplitude.toFixed(2)};`,
+            `  return {`,
+            `    x: ${source.x.toFixed(2)} + ${vx.toFixed(2)}t,`,
+            `    y: ${source.y.toFixed(2)} + ${dy.toFixed(2)}*(t/${duration.toFixed(2)}) + yOffset`,
+            `  };`,
+            `}`,
+            `// adaptation=${source.missStreak}, generated by Point ${agentKey}`
+          ];
+          vector = `y=Σ cₙ H(t-tₙ)`;
+        } else {
+          code = [
+            `function limitApproach(t) {`,
+            `  const k = ${(.65+rate*.18).toFixed(2)};`,
+            `  const L = 1 - 1/(1+k*t);`,
+            `  return {`,
+            `    x: ${source.x.toFixed(2)} + ${vx.toFixed(2)}t,`,
+            `    y: ${source.y.toFixed(2)} + ${dy.toFixed(2)}*L`,
+            `  };`,
+            `}`,
+            `// lim(t→∞) y(t) = target y`,
+            `// adaptation=${source.missStreak}, generated by Point ${agentKey}`
+          ];
+          vector = `lim t→∞ y(t)=target y`;
+        }
+        if (route.blocker) {
+          code.splice(code.length-1,0,`  // avoidance offset: ${routeOffset>0?'above':'below'} obstacle`);
+        }
+        if (learned) {
+          code.splice(code.length-1,0,
+            `  // ADAPT: obstacle (${learned.x.toFixed(1)}, ${learned.y.toFixed(1)}), curve ${learned.side>0?'above':'below'}`);
+        }
+        source.code = code;
+        source.vector = `${family}: ${vector}${route.blocker?' + route curve':''}`;
+        document.getElementById(agentKey.toLower === 'a' ? 'aVector' : 'bVector').textContent = source.vector;
+        updateInspector();
+
+        projectiles.push({
+          x:source.x,y:source.y,px:source.x,py:source.y,vx,vy,gravity,
+          age:0,life:5.5,color:source.color,owner:agentKey,ricochets:0,
+          family,duration,amplitude,frequency,rate,routeOffset,
+          adaptiveObstacle:learned?{...learned}:null,
+          originX:source.x,originY:source.y,targetX:target.x,targetY:target.y
+        });
+        const p=projectiles[projectiles.length-1];
+        const predicted=[];
+        for(let s=0;s<=40;s++){ const clone={...p,age:duration*(s/40)}; predicted.push(evaluateTrajectory(clone)); }
+        tracers.push({points:predicted,color:source.color,life:3.8,predicted:true});
+
+        const dialogue=learned
+          ? [`Obstacle learned. Adaptive curve armed.`,`Curve ${learned.side>0?'over':'under'} remembered obstacle.`,`Memory match: reroute complete.`,`${family} solution bypasses barrier.`]
+          : route.blocker
+            ? [`Curve computed. Bypass obstacle.`,`Rerouting past geometry.`,`Watch the arc.`,`${family} solution: obstacle bypass`]
+            : [`Direct solution resolved.`,`Target locked.`,`${family} function deployed.`,`Trajectory committed.`];
+        source.dialogue=dialogue[Math.floor(Math.random()*dialogue.length)];
+        source.dialogueLife=2.6;
+
+        shots++;
+        log(`executing trajectory(t)`,agentKey);
+        log(`impact solution computed: vx=${vx.toFixed(2)}, vy=${vy.toFixed(2)}`,agentKey);
+        updateHud();
+      }
+
+      function evaluateTrajectory(p) {
+        const t = Math.max(0,p.age);
+        let x = p.originX + p.vx*t;
+        let y = p.originY;
+        const dy = p.targetY-p.originY;
+
+        try {
+          if (p.family === 'quadratic') {
+            y += p.vy*t + (-p.gravity*2.2)*t*t;
+          } else if (['sin','cos','tan','arctan','arccos','arcos','arcsin','sec','csc','cot'].includes(p.family)) {
+            const phase=p.frequency*t;
+            let envelope=0;
+            if(p.family==='sin') envelope=p.amplitude*Math.sin(phase);
+            if(p.family==='cos') envelope=p.amplitude*Math.cos(phase);
+            if(p.family==='tan') envelope=p.amplitude*Math.tan(clamp(phase,-1.2,1.2));
+            if(p.family==='arctan') envelope=p.amplitude*Math.atan(t/Math.max(1,p.duration));
+            if(p.family==='arccos'||p.family==='arcos') envelope=p.amplitude*Math.acos(clamp(1-2*t/p.duration,-1,1));
+            if(p.family==='arcsin') envelope=p.amplitude*Math.asin(clamp(2*t/p.duration-1,-1,1));
+            if(p.family==='sec') envelope=p.amplitude*(1/Math.max(.18,Math.cos(phase)));
+            if(p.family==='csc') envelope=p.amplitude*(1/Math.max(.18,Math.abs(Math.sin(phase))));
+            if(p.family==='cot') envelope=p.amplitude*(Math.cos(phase)/Math.max(.18,Math.abs(Math.sin(phase))));
+            y += dy*(t/p.duration)+clamp(envelope,-5,5);
+          } else if (p.family === 'exponential') {
+            const denominator = Math.exp(p.rate*p.duration)-1;
+            y += dy*((Math.exp(p.rate*t)-1)/(denominator || 1));
+          } else if (p.family === 'logarithmic') {
+            const denominator = Math.log(1+p.rate*p.duration);
+            y += dy*(Math.log(1+p.rate*t)/(denominator || 1));
+          } else if (p.family === 'step') {
+            const stepSize = p.duration/3;
+            const phase = Math.min(3,Math.floor(t/stepSize));
+            const offsets = [-.8,0,.8,0];
+            y += dy*(t/p.duration) + offsets[phase]*p.amplitude;
+          } else if (p.family === 'limit') {
+            const k = .65+p.rate*.18;
+            y += dy*(1-1/(1+k*t));
+          } else {
+            y += p.vy*t + (-p.gravity*2.2)*t*t;
+          }
+          const curveProgress=clamp(t/Math.max(.01,p.duration),0,1);
+          y += (p.routeOffset||0)*Math.sin(Math.PI*curveProgress);
+          if (p.adaptiveObstacle) {
+            const obstacle=p.adaptiveObstacle;
+            const spread=Math.max(.9,obstacle.radius*.72);
+            const gaussian=Math.exp(-((x-obstacle.x)*(x-obstacle.x))/(2*spread*spread));
+            y += obstacle.side*(obstacle.radius+1.25)*gaussian;
+          }
+          if (p.family === 'quadratic') {
+            const predictedEnd=p.originY+p.vy*p.duration+(-p.gravity*2.2)*p.duration*p.duration;
+            y += (p.targetY-predictedEnd)*curveProgress;
+          } else if (p.family === 'limit') {
+            const k=.65+p.rate*.18;
+            const predictedEnd=p.originY+dy*(1-1/(1+k*p.duration));
+            y += (p.targetY-predictedEnd)*curveProgress;
+          }
+        } catch (_) {
+          y = p.originY+p.vy*t+(-p.gravity*2.2)*t*t;
+        }
+
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          x=p.originX+p.vx*t;
+          y=p.originY+p.vy*t+(-p.gravity*2.2)*t*t;
+        }
+        return {x,y};
+      }
+
+      function updateInspector() {
+        const a = agents[activeTab];
+        const el = document.getElementById('codeInspector');
+        if (!a.code.length) {
+          el.innerHTML = '<div class="text-slate-600 px-1">Awaiting function implementation...</div>';
+          return;
+        }
+        el.innerHTML = a.code.map((line,i) =>
+          `<div class="code-line ${i === a.code.length-2 ? 'active' : ''} px-1"><span class="inline-block w-5 text-slate-700">${i+1}</span><span>${line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></div>`
+        ).join('');
+      }
+
+      function update(dt) {
+        for (let i=projectiles.length-1;i>=0;i--) {
+          const p = projectiles[i];
+          p.px=p.x; p.py=p.y; p.age+=dt;
+          const position = evaluateTrajectory(p);
+          p.x=position.x; p.y=position.y;
+
+          if (traceEnabled && tracers.length) {
+            let tr = tracers.find(t=>t.color===p.color && t.life>0);
+            if (tr) tr.points.push({x:p.x,y:p.y});
+          }
+
+          const target = agents[p.owner === 'A' ? 'B' : 'A'];
+          if (Math.hypot(p.x-target.x,p.y-target.y) < .38) {
+            target.health -= 16;
+            agents[p.owner].score += 100;
+            agents[p.owner].missStreak = 0;
+            agents[p.owner].hits++;
+            agents[p.owner].adaptations = 0;
+            agents[p.owner].dialogue = 'Impact confirmed.';
+            agents[p.owner].dialogueLife = 2.4;
+            hits++;
+            explosionAt(p.x,p.y,p.color);
+            log(`direct hit: -16 integrity`,p.owner);
+            projectiles.splice(i,1);
+            updateHud();
+            if (target.health <= 0) endRound(p.owner);
+            continue;
+          }
+
+          const o = obstacleHit(p);
+          if (o) {
+            if (o.kind === 'absorb') {
+              explosionAt(p.x,p.y,'#a78bfa');
+              rememberObstacle(p.owner,o,p.x,p.y);
+              log(`projectile absorbed by obstacle`,p.owner);
+              registerMiss(p.owner,'absorption');
+              projectiles.splice(i,1);
+            } else if (o.kind === 'shatter') {
+              obstacles.splice(obstacles.indexOf(o),1);
+              explosionAt(p.x,p.y,'#fbbf24');
+              log(`obstacle shattered`,p.owner);
+              registerMiss(p.owner,'barrier collision');
+              projectiles.splice(i,1);
+            } else if (ricochetEnabled && p.ricochets < 2) {
+              rememberObstacle(p.owner,o,p.x,p.y);
+              const dx=p.x-p.px,dy=p.y-p.py;
+              if (Math.abs(dx) > Math.abs(dy)) p.vx=-p.vx*.72;
+              else p.vy=-p.vy*.72;
+              p.ricochets++;
+              explosionAt(p.x,p.y,p.color);
+              log(`ricochet ${p.ricochets}/2`,p.owner);
+            } else {
+              explosionAt(p.x,p.y,p.color);
+              rememberObstacle(p.owner,o,p.x,p.y);
+              registerMiss(p.owner,'barrier collision');
+              projectiles.splice(i,1);
+            }
+          }
+
+          if (p.age>p.life || p.x < -10.5 || p.x > 10.5 || p.y < -10.5 || p.y > 10.5) {
+            registerMiss(p.owner,p.age>p.life?'trajectory timeout':'boundary escape');
+            projectiles.splice(i,1);
+          }
+        }
+
+        for (let i=particles.length-1;i>=0;i--) {
+          const p=particles[i]; p.life-=dt*1.4; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy-=p.gravity*dt||0;
+          if(p.life<=0)particles.splice(i,1);
+        }
+        for (let i=explosions.length-1;i>=0;i--) {
+          explosions[i].life-=dt*1.8;
+          if(explosions[i].life<=0)explosions.splice(i,1);
+        }
+        for (const key of ['A','B']) {
+          agents[key].dialogueLife=Math.max(0,agents[key].dialogueLife-dt);
+        }
+        for(let i=tracers.length-1;i>=0;i--) {
+          tracers[i].life-=dt;
+          if(tracers[i].life<=0) tracers.splice(i,1);
+        }
+        updateHud();
+      }
+
+      function endRound(winner) {
+        roundOver=true; running=false;
+        document.getElementById('winnerText').textContent=`POINT ${winner} WINS`;
+        document.getElementById('winnerText').className=winner==='A'?'text-[9px] text-sky-400':'text-[9px] text-rose-400';
+        document.getElementById('phaseText').textContent='ROUND COMPLETE';
+        document.getElementById('roundStatus').innerHTML='<span class="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></span> ROUND COMPLETE';
+        log(`Point ${winner} wins round ${roundNumber}`,winner);
+        setTimeout(()=>{ if(roundOver){ roundNumber++; resetRound(false); }},2200);
+      }
+
+      function draw() {
+        drawGrid();
+        drawObstacles();
+
+        if (traceEnabled) {
+          for(const tr of tracers) {
+            ctx.save();ctx.strokeStyle=tr.color;ctx.shadowBlur=tr.predicted?10:4;ctx.shadowColor=tr.color;
+            ctx.globalAlpha=(tr.predicted?.38:.28)*clamp(tr.life/3.8,0,1);
+            ctx.lineWidth=tr.predicted?2:1;
+            if(tr.predicted) ctx.setLineDash([7,5]);
+            ctx.beginPath();
+            tr.points.forEach((p,i)=>i?ctx.lineTo(tx(p.x),ty(p.y)):ctx.moveTo(tx(p.x),ty(p.y)));
+            ctx.stroke();ctx.restore();
+          }
+        }
+        for(const p of projectiles) drawProjectile(p);
+        for(const e of explosions) {
+          ctx.save();ctx.globalAlpha=e.life;ctx.strokeStyle=e.color;ctx.shadowBlur=20;ctx.shadowColor=e.color;
+          ctx.beginPath();ctx.arc(tx(e.x),ty(e.y),(1-e.life)*25,0,Math.PI*2);ctx.stroke();ctx.restore();
+        }
+        for(const p of particles) {
+          ctx.save();ctx.globalAlpha=clamp(p.life,0,1);ctx.fillStyle=p.color;
+          ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),1.5,0,Math.PI*2);ctx.fill();ctx.restore();
+        }
+        drawAgent('A'); drawAgent('B');
+      }
+
+      function frame(now) {
+        const dt = Math.min((now-lastTime)/1000,.033);
+        lastTime=now;
+        fpsFrames++;
+        if(now-fpsTime>500) {
+          fps=Math.round(fpsFrames*1000/(now-fpsTime));fpsFrames=0;fpsTime=now;
+          document.getElementById('fpsText').textContent=fps+' FPS';
+        }
+        if(running&&!paused) {
+          update(dt);
+          if(!stepping) {
+            const elapsed=now-roundStart;
+            if(projectiles.length===0 && elapsed>500) {
+              if(!frame.nextShot || now>frame.nextShot) {
+                fire(turn);
+                turn=turn==='A'? 'B':'A';
+                frame.nextShot=now+(document.getElementById('aggression').value===3?650:1100);
+              }
+            }
+          } else stepping=false;
+        }
+        draw();
+        document.getElementById('tickText').textContent='T+'+((now-roundStart)/1000).toFixed(2).padStart(5,'0');
+        requestAnimationFrame(frame);
+      }
+
+      document.getElementById('startBtn').addEventListener('click',()=>{
+        if(roundOver) resetRound(false);
+        running=true;paused=false;stepping=false;
+        document.getElementById('phaseText').textContent='EXECUTION';
+        document.getElementById('roundStatus').innerHTML='<span class="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span> SYSTEM ACTIVE';
+        log('simulation started');
+      });
+      document.getElementById('pauseBtn').addEventListener('click',()=>{
+        if(!running)return;
+        paused=!paused;
+        document.getElementById('pauseBtn').textContent=paused?'▶ RESUME':'Ⅱ PAUSE';
+        document.getElementById('phaseText').textContent=paused?'PAUSED':'EXECUTION';
+      });
+      document.getElementById('stepBtn').addEventListener('click',()=>{
+        if(!running) running=true;
+        paused=true;stepping=true;
+        document.getElementById('phaseText').textContent='STEP EXECUTION';
+        fire(turn);turn=turn==='A'? 'B':'A';
+        update(.033);
+      });
+      document.getElementById('resetBtn').addEventListener('click',()=>{
+        running=false;paused=false;frame.nextShot=0;
+        resetRound(true);
+        document.getElementById('phaseText').textContent='IDLE';
+        document.getElementById('roundStatus').innerHTML='<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span> SYSTEM READY';
+      });
+
+      document.getElementById('clearLog').addEventListener('click',()=>document.getElementById('turnLog').innerHTML='');
+      document.getElementById('tabA').addEventListener('click',()=>selectTab('A'));
+      document.getElementById('tabB').addEventListener('click',()=>selectTab('B'));
+      function selectTab(tab) {
+        activeTab=tab;
+        for(const key of ['A','B']) {
+          const el=document.getElementById('tab'+key);
+          if(key===tab) {
+            el.className=key==='A'
+              ? 'tab py-2 text-[10px] rounded border border-sky-400/30 bg-sky-400/10 text-sky-300'
+              : 'tab py-2 text-[10px] rounded border border-rose-400/30 bg-rose-400/10 text-rose-300';
+          } else el.className='tab py-2 text-[10px] rounded border border-slate-700 text-slate-500';
+        }
+        updateInspector();
+      }
+
+      document.getElementById('density').addEventListener('input',e=>{
+        const v=+e.target.value;
+        document.getElementById('densityVal').textContent=v<7?'Low':v<10?'Medium':'High';
+        if(!running)generateObstacles();
+      });
+      document.getElementById('gravity').addEventListener('input',e=>{
+        document.getElementById('gravityVal').textContent=(+e.target.value/10).toFixed(1)+'×';
+      });
+      document.getElementById('aggression').addEventListener('input',e=>{
+        document.getElementById('aggressionVal').textContent=['','Cautious','Balanced','Aggressive'][+e.target.value];
+      });
+      document.getElementById('traceToggle').addEventListener('click',e=>{
+        traceEnabled=!traceEnabled;e.currentTarget.classList.toggle('toggle-on',traceEnabled);
+      });
+      document.getElementById('ricochetToggle').addEventListener('click',e=>{
+        ricochetEnabled=!ricochetEnabled;e.currentTarget.classList.toggle('toggle-on',ricochetEnabled);
+      });
+      document.getElementById('dialogueToggle').addEventListener('click',e=>{
+        dialogueEnabled=!dialogueEnabled;
+        e.currentTarget.classList.toggle('toggle-on',dialogueEnabled);
+      });
+
+      window.addEventListener('resize',resize);
+      resize();
+      resetRound(true);
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
