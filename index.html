@@ -242,8 +242,8 @@
       let activeTab = 'A', roundOver = false;
 
       const agents = {
-        A: { x: -8.2, y: 0, health: 100, score: 0, color: colors.blue, code: [], vector: null, missStreak: 0, attempts: 0, hits: 0, adaptations: 0, inventions: 0, obstacleMemory: [], dialogue: 'Awaiting trajectory...', dialogueLife: 0 },
-        B: { x: 8.2, y: 0, health: 100, score: 0, color: colors.crimson, code: [], vector: null, missStreak: 0, attempts: 0, hits: 0, adaptations: 0, inventions: 0, obstacleMemory: [], dialogue: 'Awaiting trajectory...', dialogueLife: 0 }
+        A: { x: -8.2, y: 0, health: 100, score: 0, color: colors.blue, code: [], vector: null, missStreak: 0, attempts: 0, hits: 0, adaptations: 0, inventions: 0, routeWins: 0, routeAttempts: 0, obstacleMemory: [], dialogue: 'Awaiting trajectory...', dialogueLife: 0 },
+        B: { x: 8.2, y: 0, health: 100, score: 0, color: colors.crimson, code: [], vector: null, missStreak: 0, attempts: 0, hits: 0, adaptations: 0, inventions: 0, routeWins: 0, routeAttempts: 0, obstacleMemory: [], dialogue: 'Awaiting trajectory...', dialogueLife: 0 }
       };
 
       function resize() {
@@ -292,6 +292,8 @@
           agents[key].hits = 0;
           agents[key].adaptations = 0;
           agents[key].inventions = 0;
+          agents[key].routeWins = 0;
+          agents[key].routeAttempts = 0;
           agents[key].code = [];
           agents[key].vector = null;
           agents[key].obstacleMemory = [];
@@ -453,7 +455,8 @@
 
       function moveAgentOneUnit(source, target) {
         const candidates = [
-          {x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}
+          {x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1},
+          {x:1,y:1},{x:1,y:-1},{x:-1,y:1},{x:-1,y:-1}
         ];
         let best=candidates[0], bestScore=-Infinity;
         for (const move of candidates) {
@@ -471,12 +474,18 @@
           const coverBonus=Math.max(0,2.5-nearestCover)*.24;
           const boundaryPenalty=(Math.abs(nx)>8.2||Math.abs(ny)>8.2)?-.45:0;
 
-          // The candidate route is also scored by whether a clean shot exists after moving.
-          const routePreview=chooseObstacleRoute({x:nx,y:ny},target);
-          const routeBonus=routePreview.blocker ? .7 : 1.1;
-          const adaptability=source.missStreak*.10;
-          const score=separationGain*2.4+coverBonus+boundaryPenalty+routeBonus+adaptability
-            +(Math.random()*source.missStreak*.05);
+          const smartRoute=chooseSmartBezier({x:nx,y:ny},target);
+          let futureCollisions=0;
+          for(let i=0;i<=30;i++) {
+            const u=i/30;
+            const x=cubicPoint(nx,smartRoute.p1.x,smartRoute.p2.x,target.x,u);
+            const y=cubicPoint(ny,smartRoute.p1.y,smartRoute.p2.y,target.y,u);
+            if(pointHitsObstacle(x,y,.18)) futureCollisions++;
+          }
+          const lowHealthPenalty=source.health<45&&newDistance>oldDistance?-.35:0;
+          const routeBonus=futureCollisions===0?2:Math.max(-2,-futureCollisions*.28);
+          const adaptability=source.routeWins*-.02+source.routeAttempts*.01;
+          const score=separationGain*1.2+coverBonus+boundaryPenalty+routeBonus+adaptability+lowHealthPenalty;
           if (score>bestScore) { best=move; bestScore=score; }
         }
         source.x=clamp(source.x+best.x,-9.2,9.2);
@@ -497,10 +506,67 @@
       function registerMiss(agentKey, reason) {
         const agent = agents[agentKey];
         agent.missStreak++;
+        agent.routeAttempts++;
         agent.adaptations = Math.min(5, agent.missStreak);
         agent.dialogue = `Miss detected. Recalculating ${reason}.`;
         agent.dialogueLife = 2.8;
         log(`${reason}; adaptation level ${agent.adaptations}/5`, agentKey);
+      }
+
+      function pointHitsObstacle(x,y,margin=.12) {
+        for (const o of obstacles) {
+          if (o.type==='circle') {
+            if (Math.hypot(x-o.x,y-o.y)<=o.r+margin) return o;
+          } else if (x>=o.x-o.w/2-margin && x<=o.x+o.w/2+margin &&
+                     y>=o.y-o.h/2-margin && y<=o.y+o.h/2+margin) return o;
+        }
+        return null;
+      }
+
+      function cubicPoint(a,b,c,d,u) {
+        const v=1-u;
+        return v*v*v*a+3*v*v*u*b+3*v*u*u*c+u*u*u*d;
+      }
+
+      function chooseSmartBezier(source,target) {
+        const candidates=[];
+        const dx=target.x-source.x, dy=target.y-source.y;
+        const sideOffsets=[-7,-5,-3,-1.5,0,1.5,3,5,7];
+        for (const offset of sideOffsets) {
+          const perpendicular={x:-dy/Math.max(1,Math.hypot(dx,dy)),y:dx/Math.max(1,Math.hypot(dx,dy))};
+          const p1={
+            x:clamp(source.x+(dx*.28)+perpendicular.x*offset,-9,9),
+            y:clamp(source.y+(dy*.28)+perpendicular.y*offset,-9,9)
+          };
+          const p2={
+            x:clamp(source.x+(dx*.72)+perpendicular.x*offset*.75,-9,9),
+            y:clamp(source.y+(dy*.72)+perpendicular.y*offset*.75,-9,9)
+          };
+          candidates.push({p1,p2,name:`SmartBezier_${Math.abs(offset).toFixed(1).replace('.','')}_${offset>=0?'R':'L'}`});
+        }
+
+        let best=null, bestScore=-Infinity, lowestCollision=Infinity;
+        for (const route of candidates) {
+          let collisions=0, pathLength=0, clearance=Infinity, previous=null;
+          for(let i=0;i<=60;i++) {
+            const u=i/60;
+            const x=cubicPoint(source.x,route.p1.x,route.p2.x,target.x,u);
+            const y=cubicPoint(source.y,route.p1.y,route.p2.y,target.y,u);
+            if(pointHitsObstacle(x,y,.22)) collisions++;
+            if(previous) pathLength+=Math.hypot(x-previous.x,y-previous.y);
+            for(const o of obstacles) {
+              clearance=Math.min(clearance,Math.hypot(x-o.x,y-o.y)-(o.type==='circle'?o.r:Math.max(o.w,o.h)/2));
+            }
+            previous={x,y};
+          }
+          const score=-collisions*30-pathLength*.08+Math.max(0,clearance)*.35;
+          if(collisions===0 && score>bestScore) { best=route; bestScore=score; }
+          if(collisions<lowestCollision) {
+            lowestCollision=collisions;
+            if(!best) { best=route; bestScore=score; }
+          }
+        }
+        return best||candidates[4];
       }
 
       function inventExtremeRoute(source, target) {
@@ -586,8 +652,8 @@
         source.attempts++;
 
         // Repeated misses reduce random error and progressively broaden function selection.
-        const missReduction = Math.min(.85, source.missStreak * .13);
-        const inaccuracy = (3-difficulty)*.28*(1-missReduction);
+        const missReduction = Math.min(.95, source.missStreak * .15);
+        const inaccuracy = (3-difficulty)*.08*(1-missReduction);
         const aimAngle = Math.atan2(dy,dx) + randomRange(-inaccuracy,inaccuracy);
         const arc = .8 + Math.random()*1.8 + (3-difficulty)*.3 + source.missStreak*.12;
         const speed = clamp(dist * (.62 + difficulty*.05), 5.8, 10.2);
@@ -608,21 +674,19 @@
 
         const families = [
           'quadratic','sin','cos','tan','arctan','arccos','arcos','arcsin',
-          'sec','csc','cot','exponential','logarithmic','step','limit','invented'
+          'sec','csc','cot','exponential','logarithmic','step','limit','invented','smartBezier'
         ];
-        let familyIndex = source.missStreak >= 2
-          ? Math.floor(Math.random()*families.length)
-          : Math.floor(Math.random()*Math.min(10, families.length));
-        let family = families[familyIndex];
-        if (learned) {
-          family = 'invented';
-        } else if (source.attempts % 4 === 0 || (source.missStreak >= 2 && Math.random()<.35)) {
-          family = 'invented';
-        }
+        let family = 'smartBezier';
+        if (source.attempts % 5 === 0) family = 'invented';
         const amplitude = clamp(.55 + source.missStreak*.18 + Math.random()*1.1, .55, 2.2);
         const frequency = .9 + source.missStreak*.12;
         const rate = .7 + source.missStreak*.15;
         let inventedRoute=null;
+        let smartRoute=null;
+        if (family === 'smartBezier') {
+          smartRoute=chooseSmartBezier(source,target);
+          inventedRoute={name:smartRoute.name,p1:smartRoute.p1,p2:smartRoute.p2,edge:{name:'Predicted Clear Route'}};
+        }
         if (family === 'invented') {
           inventedRoute=inventExtremeRoute(source,target);
           source.inventions++;
@@ -671,6 +735,23 @@
             csc:'y=A csc(ωt)+Bt+C',cot:'y=A cot(ωt)+Bt+C'
           };
           vector=notation[family];
+        } else if (family === 'smartBezier') {
+          const r=inventedRoute;
+          code = [
+            `function ${r.name}(t) {`,
+            `  // predictive clear-route cubic Bezier`,
+            `  const u = clamp(t/${duration.toFixed(2)},0,1);`,
+            `  const bezier = (a,b,c,d,u) =>`,
+            `    (1-u)**3*a + 3*(1-u)**2*u*b + 3*(1-u)*u**2*c + u**3*d;`,
+            `  return {`,
+            `    x: bezier(${source.x.toFixed(2)},${r.p1.x.toFixed(2)},${r.p2.x.toFixed(2)},${target.x.toFixed(2)},u),`,
+            `    y: bezier(${source.y.toFixed(2)},${r.p1.y.toFixed(2)},${r.p2.y.toFixed(2)},${target.y.toFixed(2)},u)`,
+            `  };`,
+            `}`,
+            `// predictive route: no sampled collisions`,
+            `// generated by Point ${agentKey}`
+          ];
+          vector=`Bezier³ → ${r.edge.name}`;
         } else if (family === 'invented') {
           const r=inventedRoute;
           code = [
@@ -790,7 +871,7 @@
         const dy = p.targetY-p.originY;
 
         try {
-          if (p.family === 'invented' && p.inventedRoute) {
+          if ((p.family === 'invented'||p.family==='smartBezier') && p.inventedRoute) {
             const u=clamp(t/Math.max(.01,p.duration),0,1);
             const blend=(a,b,c,d)=>((1-u)**3*a+3*(1-u)**2*u*b+3*(1-u)*u*u*c+u**3*d);
             const r=p.inventedRoute;
@@ -885,6 +966,8 @@
             agents[p.owner].score += 100;
             agents[p.owner].missStreak = 0;
             agents[p.owner].hits++;
+            agents[p.owner].routeWins++;
+            agents[p.owner].routeAttempts++;
             agents[p.owner].adaptations = 0;
             agents[p.owner].dialogue = 'Impact confirmed.';
             agents[p.owner].dialogueLife = 2.4;
