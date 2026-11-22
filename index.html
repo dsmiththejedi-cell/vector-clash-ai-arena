@@ -393,7 +393,7 @@
           ctx.save();
           ctx.globalAlpha=clamp(a.dialogueLife/2,0,1);
           ctx.font='600 9px ui-monospace, monospace';
-          const width=Math.min(190,ctx.measureText(a.dialogue).width+18);
+          const width=Math.min(260,ctx.measureText(a.dialogue).width+18);
           const bx=clamp(sx-width/2,8,w-width-8);
           const by=Math.max(8,sy-48);
           ctx.fillStyle='rgba(8,11,21,.94)';
@@ -718,11 +718,12 @@
         for(let s=0;s<=40;s++){ const clone={...p,age:duration*(s/40)}; predicted.push(evaluateTrajectory(clone)); }
         tracers.push({points:predicted,color:source.color,life:3.8,predicted:true});
 
+        const functionName = `${family}(t)`;
         const dialogue=learned
-          ? [`Obstacle learned. Adaptive curve armed.`,`Curve ${learned.side>0?'over':'under'} remembered obstacle.`,`Memory match: reroute complete.`,`${family} solution bypasses barrier.`]
+          ? [`${functionName}: adaptive curve armed.`,`${functionName}: curve ${learned.side>0?'over':'under'} barrier.`,`${functionName}: obstacle memory engaged.`,`${functionName}: adaptive bypass active.`]
           : route.blocker
-            ? [`Curve computed. Bypass obstacle.`,`Rerouting past geometry.`,`Watch the arc.`,`${family} solution: obstacle bypass`]
-            : [`Direct solution resolved.`,`Target locked.`,`${family} function deployed.`,`Trajectory committed.`];
+            ? [`${functionName}: bypassing obstacle.`,`${functionName}: rerouting past geometry.`,`${functionName}: watch the arc.`,`${functionName}: obstacle bypass armed.`]
+            : [`${functionName}: direct solution resolved.`,`${functionName}: target locked.`,`${functionName}: function deployed.`,`${functionName}: trajectory committed.`];
         source.dialogue=dialogue[Math.floor(Math.random()*dialogue.length)];
         source.dialogueLife=2.6;
 
